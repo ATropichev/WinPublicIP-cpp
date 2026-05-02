@@ -10,7 +10,7 @@
 
 A lightweight Windows system tray application written in **C++17 / Win32 API** that displays your current public IP address, country flag, and VPN status — inspired by the [Public IP Address widget for KDE 6](https://github.com/Davide-sd/ip_address).
 
-No .NET, no Electron, no runtime dependencies. Single native `.exe`, ~250 KB.
+No .NET, no Electron, no runtime dependencies. Single native `.exe`, ~477 KB.
 
 ### Features
 
@@ -47,7 +47,7 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 # Build
 cmake --build build
 
-# Output: build\WinPublicIP.exe (~250 KB)
+# Output: build\WinPublicIP.exe (~477 KB)
 ```
 
 ### Configuration
@@ -104,7 +104,7 @@ MIT — see [LICENSE](LICENSE).
 
 Лёгкое приложение для системного трея Windows на **C++17 / Win32 API**: отображает публичный IP-адрес, флаг страны и статус VPN — по образцу плазмоида [Public IP Address widget for KDE 6](https://github.com/Davide-sd/ip_address).
 
-Без .NET, без Electron, без зависимостей рантайма. Один нативный `.exe` ~250 КБ.
+Без .NET, без Electron, без зависимостей рантайма. Один нативный `.exe` ~477 КБ.
 
 ### Возможности
 
@@ -141,7 +141,7 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 # Сборка
 cmake --build build
 
-# Результат: build\WinPublicIP.exe (~250 КБ)
+# Результат: build\WinPublicIP.exe (~477 КБ)
 ```
 
 ### Конфигурация

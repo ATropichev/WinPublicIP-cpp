@@ -73,15 +73,16 @@ static LRESULT CALLBACK DlgProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
         SendMessageW(state->hSpin, UDM_SETPOS32,    0,
                      state->settings->refreshIntervalSeconds);
 
-        // Кнопки — расположены по центру снизу
+        // Кнопки — по центру снизу с отступом 12px от края
+        // Клиентская область 314px: (314 - 75 - 6 - 75) / 2 = 79
         HWND hOk = CreateWindowExW(0, L"BUTTON", L"OK",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-            148, 50, 72, 26, hWnd,
+            79, 52, 75, 26, hWnd,
             reinterpret_cast<HMENU>(IDOK), cs->hInstance, nullptr);
 
         HWND hCancel = CreateWindowExW(0, L"BUTTON", L"Отмена",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-            228, 50, 72, 26, hWnd,
+            160, 52, 75, 26, hWnd,
             reinterpret_cast<HMENU>(IDCANCEL), cs->hInstance, nullptr);
 
         // Применяем шрифт ко всем элементам
@@ -137,12 +138,16 @@ bool ShowSettingsDialog(HWND hParent, HINSTANCE hInstance, AppSettings& settings
     DlgState state;
     state.settings = &settings;
 
-    CreateWindowExW(
-        WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-        DLG_CLASS,
+    // Рассчитываем размер окна по нужной клиентской области (314 x 100)
+    DWORD style   = WS_CAPTION | WS_SYSMENU;
+    DWORD exStyle = WS_EX_DLGMODALFRAME | WS_EX_TOPMOST;
+    RECT rc = {0, 0, 314, 100};
+    AdjustWindowRectEx(&rc, style, FALSE, exStyle);
+
+    CreateWindowExW(exStyle, DLG_CLASS,
         L"WinPublicIP — Настройки",
-        WS_VISIBLE | WS_CAPTION | WS_SYSMENU,
-        0, 0, 316, 106,
+        WS_VISIBLE | style,
+        0, 0, rc.right - rc.left, rc.bottom - rc.top,
         hParent, nullptr, hInstance, &state);
 
     MSG msg;

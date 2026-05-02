@@ -42,9 +42,9 @@ static std::unique_ptr<Gdiplus::Bitmap> MakePlaceholder(Gdiplus::ARGB color)
 
 TrayRenderer::TrayRenderer()
 {
-    shieldOn_  = LoadNamedResource("SHIELD_ON");
-    shieldOff_ = LoadNamedResource("SHIELD_OFF");
-    offline_   = LoadNamedResource("OFFLINE");
+    shieldOn_  = LoadNamedResource("WPI_SHIELD_ON");
+    shieldOff_ = LoadNamedResource("WPI_SHIELD_OFF");
+    offline_   = LoadNamedResource("WPI_OFFLINE");
     if (!shieldOn_)  shieldOn_  = MakePlaceholder(0xFF22BB22);
     if (!shieldOff_) shieldOff_ = MakePlaceholder(0xFF888888);
     if (!offline_)   offline_   = MakePlaceholder(0xFFCC2222);

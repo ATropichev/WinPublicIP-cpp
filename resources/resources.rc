@@ -1,13 +1,10 @@
 // WinPublicIP resources
-#include <windows.h>
-
-// Application icon (placeholder — replace with real .ico)
-// IDI_APP  ICON  "resources/app.ico"
+// Note: no #include <windows.h> — avoids macro collisions with resource names
 
 // Shield and status icons
-SHIELD_ON    RCDATA  "resources/shield_on.png"
-SHIELD_OFF   RCDATA  "resources/shield_off.png"
-OFFLINE      RCDATA  "resources/offline.png"
+WPI_SHIELD_ON    RCDATA  "resources/shield_on.png"
+WPI_SHIELD_OFF   RCDATA  "resources/shield_off.png"
+WPI_OFFLINE      RCDATA  "resources/offline.png"
 
 // Country flags (ISO 3166-1 alpha-2, uppercase)
 FLAG_AE		RCDATA		"resources/Flags/ae.png"

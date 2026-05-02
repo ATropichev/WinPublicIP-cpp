@@ -1,4 +1,6 @@
 #pragma once
+#include <windows.h>
+#include <objidl.h>
 #include <gdiplus.h>
 #include <string>
 #include <unordered_map>

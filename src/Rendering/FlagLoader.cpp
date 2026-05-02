@@ -1,12 +1,13 @@
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <objidl.h>
 #include <gdiplus.h>
 #include <algorithm>
 #include <cctype>
 #include "FlagLoader.h"
 
 static std::string ToUpper(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), ::toupper);
+    std::transform(s.begin(), s.end(), s.begin(),
+        [](unsigned char c) { return (char)::toupper(c); });
     return s;
 }
 

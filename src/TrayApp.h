@@ -1,5 +1,4 @@
 #pragma once
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <string>
 #include "Config/AppSettings.h"
@@ -45,7 +44,7 @@ private:
     void ShowContextMenu();
     void CopyIpToClipboard();
     void StartRefreshThread();
-    void OnRefreshDone(WPARAM wp);
+    void OnRefreshDone(WPARAM wp, LPARAM lp);
     void OpenSettings();
 
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);

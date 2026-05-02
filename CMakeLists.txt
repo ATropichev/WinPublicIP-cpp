@@ -34,6 +34,9 @@ target_compile_definitions(WinPublicIP PRIVATE
     NOMINMAX
 )
 
+# Пути для компилятора ресурсов (rc.exe запускается из build/, нужен корень проекта)
+set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /I\"${CMAKE_SOURCE_DIR}\"")
+
 target_compile_options(WinPublicIP PRIVATE
     /W4       # предупреждения уровня 4
     /WX-      # предупреждения не являются ошибками

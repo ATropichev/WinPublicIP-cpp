@@ -1,6 +1,7 @@
 #pragma once
-#include <gdiplus.h>
 #include <windows.h>
+#include <objidl.h>
+#include <gdiplus.h>
 #include <string>
 #include "FlagLoader.h"
 
@@ -16,8 +17,7 @@ private:
     FlagLoader flagLoader_;
     HICON      lastIcon_ = nullptr;
 
-    HICON Compose(Gdiplus::Bitmap* background, const std::string& overlayRes);
-    Gdiplus::Bitmap* LoadResource(const std::string& name);
+    HICON Compose(Gdiplus::Bitmap* background, Gdiplus::Bitmap* overlay);
     std::unique_ptr<Gdiplus::Bitmap> shieldOn_;
     std::unique_ptr<Gdiplus::Bitmap> shieldOff_;
     std::unique_ptr<Gdiplus::Bitmap> offline_;

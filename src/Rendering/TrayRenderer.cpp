@@ -1,5 +1,5 @@
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <objidl.h>
 #include <gdiplus.h>
 #include "TrayRenderer.h"
 
@@ -34,7 +34,8 @@ static std::unique_ptr<Gdiplus::Bitmap> MakePlaceholder(Gdiplus::ARGB color)
 {
     auto bmp = std::make_unique<Gdiplus::Bitmap>(32, 32, PixelFormat32bppARGB);
     Gdiplus::Graphics g(bmp.get());
-    Gdiplus::SolidBrush br(Gdiplus::Color(color));
+    Gdiplus::Color c(color);
+    Gdiplus::SolidBrush br(c);
     g.FillRectangle(&br, 0, 0, 32, 32);
     return bmp;
 }

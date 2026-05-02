@@ -4,17 +4,8 @@
 #include <iphlpapi.h>
 #include <algorithm>
 #include <string>
-#include <fstream>
 #include <vector>
 #include "VpnDetector.h"
-
-static void VpnLog(const std::string& msg)
-{
-    char tmp[MAX_PATH];
-    GetTempPathA(MAX_PATH, tmp);
-    std::ofstream f(std::string(tmp) + "WinPublicIP.log", std::ios::app);
-    f << "[VPN] " << msg << "\n";
-}
 
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -61,18 +52,10 @@ bool VpnDetector::IsActive() const
         if (a->Description)
             desc += L" " + std::wstring(a->Description);
 
-        // Лог: имя интерфейса и статус
-        std::string nameA(name.begin(), name.end());
-        VpnLog("Adapter [status=" + std::to_string(a->OperStatus) + "]: " + nameA);
-
         if (a->OperStatus != IfOperStatusUp) continue;
 
         for (const auto& pattern : patterns_) {
-            if (ContainsCI(desc, pattern)) {
-                std::string pat(pattern.begin(), pattern.end());
-                VpnLog("  -> MATCH pattern: " + pat);
-                return true;
-            }
+            if (ContainsCI(desc, pattern)) return true;
         }
     }
     return false;

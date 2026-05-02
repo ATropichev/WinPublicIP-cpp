@@ -2,18 +2,9 @@
 #include <shellapi.h>
 #include <thread>
 #include <string>
-#include <fstream>
 #include <stdexcept>
 #include "TrayApp.h"
 #include "SettingsDialog.h"
-
-static void Log(const std::string& msg)
-{
-    char tmp[MAX_PATH];
-    GetTempPathA(MAX_PATH, tmp);
-    std::ofstream f(std::string(tmp) + "WinPublicIP.log", std::ios::app);
-    f << msg << "\n";
-}
 
 static const wchar_t* WND_CLASS = L"WinPublicIPHost";
 static const UINT     TRAY_ID   = 1;
@@ -158,17 +149,13 @@ void TrayApp::StartRefreshThread()
     std::thread([this]() {
         auto* result = new RefreshResult();
         try {
-            result->ip    = ipProvider_.Get();
-            Log("IP: " + result->ip);
-            result->geo   = geoProvider_.Get(result->ip);
-            Log("Country: " + result->geo.country + " (" + result->geo.countryCode + ")");
-            result->vpnOn = vpnDetector_.IsActive();
-            Log("VPN: " + std::string(result->vpnOn ? "on" : "off"));
+            result->ip      = ipProvider_.Get();
+            result->geo     = geoProvider_.Get(result->ip);
+            result->vpnOn   = vpnDetector_.IsActive();
             result->success = true;
         } catch (const std::exception& e) {
             result->success = false;
             result->error   = e.what();
-            Log("ERROR: " + std::string(e.what()));
         }
         // Передаём результат в UI-поток
         PostMessageW(hWnd_, WM_APP_REFRESH, 0,

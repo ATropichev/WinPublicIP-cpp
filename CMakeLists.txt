@@ -4,6 +4,9 @@ project(WinPublicIP VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Статическая линковка CRT — убирает зависимость от VC++ Redistributable
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 # Все исходники
 set(SOURCES
     src/main.cpp

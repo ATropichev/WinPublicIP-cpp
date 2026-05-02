@@ -1,0 +1,25 @@
+## CMake
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+
+## MSVC
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+.vs/
+
+## VS Code
+.vscode/
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store

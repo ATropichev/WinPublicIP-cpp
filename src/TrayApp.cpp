@@ -174,8 +174,9 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
         HICON icon = renderer_.Render(result->geo.countryCode, result->vpnOn);
         std::wstring vpnStr = result->vpnOn ? L"on" : L"off";
         std::wstring tooltip =
-            L"IP: " + ToWide(result->ip) + L"\n" +
-            ToWide(result->geo.country)  + L"\nVPN: " + vpnStr;
+            L"IP: " + ToWide(result->ip) +
+            L" | " + ToWide(result->geo.country) +
+            L" | VPN: " + vpnStr;
         UpdateTrayIcon(icon, tooltip);
 
         // Balloon при смене IP

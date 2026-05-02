@@ -47,17 +47,11 @@ bool VpnDetector::IsActive() const
     for (auto* a = adapters; a; a = a->Next) {
         if (a->OperStatus != IfOperStatusUp) continue;
 
+        // FriendlyName и Description — оба PWSTR в IP_ADAPTER_ADDRESSES
         std::wstring name(a->FriendlyName ? a->FriendlyName : L"");
-        std::wstring desc = ToWide(a->AdapterName ? a->AdapterName : "");
-        // Description хранится в char*, конвертируем
-        if (a->Description) {
-            int len = MultiByteToWideChar(CP_ACP, 0, reinterpret_cast<const char*>(a->Description), -1, nullptr, 0);
-            std::wstring d(len, 0);
-            MultiByteToWideChar(CP_ACP, 0, reinterpret_cast<const char*>(a->Description), -1, d.data(), len);
-            desc = name + L" " + d;
-        } else {
-            desc = name;
-        }
+        std::wstring desc = name;
+        if (a->Description)
+            desc += L" " + std::wstring(a->Description);
 
         for (const auto& pattern : patterns_) {
             if (ContainsCI(desc, pattern)) return true;

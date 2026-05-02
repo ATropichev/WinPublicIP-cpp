@@ -10,6 +10,7 @@ set(SOURCES
     src/TrayApp.cpp
     src/SettingsDialog.cpp
     src/Config/AppSettings.cpp
+    src/Services/HttpHelper.cpp
     src/Services/IpProvider.cpp
     src/Services/GeoProvider.cpp
     src/Services/VpnDetector.cpp

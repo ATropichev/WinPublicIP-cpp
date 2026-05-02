@@ -4,7 +4,6 @@
 #include <iphlpapi.h>
 #include <algorithm>
 #include <string>
-#include <vector>
 #include "VpnDetector.h"
 
 #pragma comment(lib, "iphlpapi.lib")

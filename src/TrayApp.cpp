@@ -188,8 +188,8 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
         std::wstring vpnStr = result->vpnOn ? L"on" : L"off";
         std::wstring tooltip =
             L"IP: " + ToWide(result->ip) +
-            L" | " + ToWide(result->geo.country) +
-            L" | VPN: " + vpnStr;
+            L"\n" + ToWide(result->geo.country) +
+            L"\nVPN: " + vpnStr;
         UpdateTrayIcon(icon, tooltip);
 
         // Balloon при смене IP

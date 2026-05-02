@@ -6,7 +6,7 @@
 static IStream* NamedResourceToStream(const char* name)
 {
     HMODULE hMod = GetModuleHandleW(nullptr);
-    HRSRC hRes = FindResourceA(hMod, name, "RCDATA");
+    HRSRC hRes = FindResourceA(hMod, name, MAKEINTRESOURCEA(10));
     if (!hRes) return nullptr;
     HGLOBAL hGlob = LoadResource(hMod, hRes);
     DWORD size = SizeofResource(hMod, hRes);

@@ -16,7 +16,7 @@ static IStream* ResourceToStream(const std::string& name)
 {
     HMODULE hMod = GetModuleHandleW(nullptr);
     std::string resName = "FLAG_" + ToUpper(name);
-    HRSRC hRes = FindResourceA(hMod, resName.c_str(), "RCDATA");
+    HRSRC hRes = FindResourceA(hMod, resName.c_str(), MAKEINTRESOURCEA(10));
     if (!hRes) return nullptr;
     HGLOBAL hGlob = LoadResource(hMod, hRes);
     if (!hGlob) return nullptr;

@@ -4,7 +4,17 @@
 #include <iphlpapi.h>
 #include <algorithm>
 #include <string>
+#include <fstream>
+#include <vector>
 #include "VpnDetector.h"
+
+static void VpnLog(const std::string& msg)
+{
+    char tmp[MAX_PATH];
+    GetTempPathA(MAX_PATH, tmp);
+    std::ofstream f(std::string(tmp) + "WinPublicIP.log", std::ios::app);
+    f << "[VPN] " << msg << "\n";
+}
 
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -12,9 +22,9 @@
 static std::wstring ToWide(const std::string& s)
 {
     if (s.empty()) return {};
-    int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
     std::wstring w(len, 0);
-    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, w.data(), len);
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), w.data(), len);
     return w;
 }
 
@@ -45,16 +55,24 @@ bool VpnDetector::IsActive() const
         return false;
 
     for (auto* a = adapters; a; a = a->Next) {
-        if (a->OperStatus != IfOperStatusUp) continue;
-
         // FriendlyName и Description — оба PWSTR в IP_ADAPTER_ADDRESSES
         std::wstring name(a->FriendlyName ? a->FriendlyName : L"");
         std::wstring desc = name;
         if (a->Description)
             desc += L" " + std::wstring(a->Description);
 
+        // Лог: имя интерфейса и статус
+        std::string nameA(name.begin(), name.end());
+        VpnLog("Adapter [status=" + std::to_string(a->OperStatus) + "]: " + nameA);
+
+        if (a->OperStatus != IfOperStatusUp) continue;
+
         for (const auto& pattern : patterns_) {
-            if (ContainsCI(desc, pattern)) return true;
+            if (ContainsCI(desc, pattern)) {
+                std::string pat(pattern.begin(), pattern.end());
+                VpnLog("  -> MATCH pattern: " + pat);
+                return true;
+            }
         }
     }
     return false;

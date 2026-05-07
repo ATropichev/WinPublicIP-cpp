@@ -69,11 +69,13 @@ HICON TrayRenderer::Compose(Gdiplus::Bitmap* bg, Gdiplus::Bitmap* overlay)
     HBITMAP hBmp = nullptr;
     canvas.GetHBITMAP(Gdiplus::Color(0, 0, 0, 0), &hBmp);
 
+    // Маска: 1-bpp битмап (для 32-бит иконок Windows использует альфа-канал,
+    // маска игнорируется — но ICONINFO требует валидный hbmMask).
+    // CreateBitmap не требует DC, в отличие от CreateCompatibleBitmap(GetDC(nullptr),...).
     ICONINFO ii{};
     ii.fIcon    = TRUE;
     ii.hbmColor = hBmp;
-    // Маска: однобитный битмап 32x32
-    ii.hbmMask  = CreateCompatibleBitmap(GetDC(nullptr), 32, 32);
+    ii.hbmMask  = CreateBitmap(32, 32, 1, 1, nullptr);
     HICON icon  = CreateIconIndirect(&ii);
 
     DeleteObject(ii.hbmColor);

@@ -67,10 +67,11 @@ Settings are stored in `%APPDATA%\WinPublicIP\config.json`:
 If `config.json` is malformed or contains values that must be normalized, the app keeps a backup next to it:
 
 ```text
-config.invalid.YYYYMMDD-HHMMSS.json
+config.invalid.YYYYMMDD-HHMMSS-mmm.json
+config.invalid.YYYYMMDD-HHMMSS-mmm.N.json
 ```
 
-Then it writes a repaired `config.json` with safe defaults or normalized values.
+The backup name includes milliseconds, and a numeric suffix is added if needed to avoid collisions. Existing backups are not overwritten. After a backup is created, the app writes a repaired `config.json` with safe defaults or normalized values. If the backup cannot be created, the original `config.json` is left untouched and repaired settings are used only in memory for the current run.
 
 Provider settings and `vpnInterfacePatterns` are loaded at startup. Restart the app after editing them manually in `config.json`.
 
@@ -180,10 +181,11 @@ cmake --build build
 Если `config.json` повреждён или содержит значения, которые нужно нормализовать, приложение сохраняет резервную копию рядом:
 
 ```text
-config.invalid.YYYYMMDD-HHMMSS.json
+config.invalid.YYYYMMDD-HHMMSS-mmm.json
+config.invalid.YYYYMMDD-HHMMSS-mmm.N.json
 ```
 
-После этого записывается исправленный `config.json` с безопасными значениями по умолчанию или нормализованными значениями.
+Имя backup-файла включает миллисекунды, а при необходимости добавляется числовой суффикс, чтобы избежать коллизий. Существующие backup-файлы не перезаписываются. После создания backup приложение записывает исправленный `config.json` с безопасными значениями по умолчанию или нормализованными значениями. Если backup создать не удалось, исходный `config.json` остаётся нетронутым, а исправленные настройки используются только в памяти в рамках текущего запуска.
 
 Настройки провайдеров и `vpnInterfacePatterns` загружаются при старте. После ручного изменения этих полей в `config.json` перезапустите приложение.
 

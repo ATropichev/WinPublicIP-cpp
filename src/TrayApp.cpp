@@ -175,12 +175,15 @@ void TrayApp::StartRefreshThread()
     if (shuttingDown_.load())
         return;
 
+    if (refreshThread_.joinable()) {
+        if (refreshInProgress_.load())
+            return;
+        refreshThread_.join();
+    }
+
     bool expected = false;
     if (!refreshInProgress_.compare_exchange_strong(expected, true))
         return;
-
-    if (refreshThread_.joinable())
-        refreshThread_.join();
 
     std::uint64_t seq = ++nextRefreshSeq_;
     latestRefreshSeq_ = seq;
@@ -211,6 +214,8 @@ void TrayApp::StartRefreshThread()
 void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
 {
     std::unique_ptr<RefreshResult> result(reinterpret_cast<RefreshResult*>(lp));
+    if (refreshThread_.joinable())
+        refreshThread_.join();
 
     if (result->seq != latestRefreshSeq_) {
         refreshInProgress_.store(false);

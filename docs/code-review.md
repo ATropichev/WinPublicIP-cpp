@@ -12,7 +12,7 @@ Status values: `Resolved`, `Partially resolved`, `Open`.
 
 ### 1. Detached refresh threads can outlive `TrayApp`
 
-Status: `Partially resolved`
+Status: `Resolved`
 
 `src/TrayApp.cpp` starts refresh work with `std::thread([this] { ... }).detach()`. If the application exits while a request is still running, the detached thread can continue using `ipProvider_`, `geoProvider_`, `vpnDetector_`, and `hWnd_` after `TrayApp` has been destroyed.
 
@@ -134,7 +134,7 @@ Status: `Resolved`
 
 ### 1. Detached-потоки обновления могут пережить `TrayApp`
 
-Статус: `Partially resolved`
+Статус: `Resolved`
 
 `src/TrayApp.cpp` запускает обновление через `std::thread([this] { ... }).detach()`. Если приложение закрывается, пока HTTP-запрос ещё выполняется, detached-поток может продолжить использовать `ipProvider_`, `geoProvider_`, `vpnDetector_` и `hWnd_` после уничтожения `TrayApp`.
 

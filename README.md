@@ -33,6 +33,10 @@ Download `WinPublicIP.exe` from [Releases](../../releases) and run it. The icon 
 
 Optionally enable **Start with Windows** in the context menu.
 
+The autorun checkmark reflects the registry entry for the currently running `.exe` path. If you move the portable executable to another folder, start it from the new location and enable **Start with Windows** again to update the registry path. If several copies exist in different folders, only the copy whose path matches the registry autorun entry is shown as enabled; enabling autorun from another copy replaces the autorun target with that copy.
+
+Autorun is intentionally not stored in `config.json`; the Windows Run registry entry is the source of truth.
+
 ### Build from source
 
 **Requirements:** Visual Studio Build Tools 2022 (MSVC + Windows 11 SDK), CMake 3.20+, Ninja
@@ -59,8 +63,7 @@ Settings are stored in `%APPDATA%\WinPublicIP\config.json`:
   "refreshIntervalSeconds": 60,
   "geoProvider": "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,isp,query",
   "vpnInterfacePatterns": ["TAP", "tun", "WireGuard", "OpenVPN", "Tailscale", "ZeroTier", "PPP", "WAN Miniport (IKEv2)"],
-  "notifyOnIpChange": true,
-  "startWithWindows": false
+  "notifyOnIpChange": true
 }
 ```
 
@@ -147,6 +150,10 @@ MIT — see [LICENSE](LICENSE).
 
 Опционально включить **Запускать с Windows** в контекстном меню.
 
+Отметка автозапуска отражает запись в реестре для текущего пути запущенного `.exe`. Если portable-файл был перемещён в другую папку, запустите его из нового места и снова включите **Запускать с Windows**, чтобы обновить путь в реестре. Если у пользователя есть несколько копий в разных папках, включённой будет считаться только та копия, путь которой совпадает с записью автозапуска; включение автозапуска из другой копии заменит цель автозапуска на эту копию.
+
+Автозапуск намеренно не хранится в `config.json`; источником истины является запись Windows Run в реестре.
+
 ### Сборка из исходников
 
 **Требования:** Visual Studio Build Tools 2022 (MSVC + Windows 11 SDK), CMake 3.20+, Ninja
@@ -173,8 +180,7 @@ cmake --build build
   "refreshIntervalSeconds": 60,
   "geoProvider": "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,isp,query",
   "vpnInterfacePatterns": ["TAP", "tun", "WireGuard", "OpenVPN", "Tailscale", "ZeroTier", "PPP", "WAN Miniport (IKEv2)"],
-  "notifyOnIpChange": true,
-  "startWithWindows": false
+  "notifyOnIpChange": true
 }
 ```
 

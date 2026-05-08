@@ -139,6 +139,8 @@ void TrayApp::RemoveTrayIcon()
 
 void TrayApp::ShowContextMenu()
 {
+    settings_.startWithWindows = settings_.IsAutorunEnabled();
+
     HMENU hMenu = CreatePopupMenu();
 
     // Отображение IP (disabled)
@@ -347,10 +349,14 @@ LRESULT CALLBACK TrayApp::WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
         case ID_COPY_IP:  app->CopyIpToClipboard();    break;
         case ID_SETTINGS: app->OpenSettings();         break;
         case ID_AUTORUN:
-            app->settings_.startWithWindows = !app->settings_.startWithWindows;
-            app->settings_.SetAutorun(app->settings_.startWithWindows);
-            app->settings_.Save();
+        {
+            bool enable = !app->settings_.IsAutorunEnabled();
+            if (app->settings_.SetAutorun(enable)) {
+                app->settings_.startWithWindows = app->settings_.IsAutorunEnabled();
+                app->settings_.Save();
+            }
             break;
+        }
         case ID_QUIT:
             PostQuitMessage(0);
             break;

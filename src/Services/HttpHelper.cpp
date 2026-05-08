@@ -2,6 +2,7 @@
 #include <winhttp.h>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <vector>
 #include "HttpHelper.h"
 
@@ -29,6 +30,7 @@ static std::wstring ToWide(const std::string& s)
 
 std::string HttpGet(const std::string& url, int timeoutMs)
 {
+    constexpr size_t MaxBodySize = 1024 * 1024;
     std::wstring wUrl = ToWide(url);
 
     URL_COMPONENTS uc{};
@@ -84,12 +86,17 @@ std::string HttpGet(const std::string& url, int timeoutMs)
             WINHTTP_NO_HEADER_INDEX)) {
         throw std::runtime_error("HttpGet: status unavailable");
     }
-    if (statusCode < 200 || statusCode >= 300)
-        throw std::runtime_error("HttpGet: non-success status");
+    if (statusCode < 200 || statusCode >= 300) {
+        std::ostringstream os;
+        os << "HttpGet: non-success status " << statusCode;
+        throw std::runtime_error(os.str());
+    }
 
     std::string body;
     DWORD avail = 0;
     while (WinHttpQueryDataAvailable(hRequest, &avail) && avail > 0) {
+        if (body.size() + avail > MaxBodySize)
+            throw std::runtime_error("HttpGet: response too large");
         std::vector<char> buf(avail);
         DWORD read = 0;
         if (!WinHttpReadData(hRequest, buf.data(), avail, &read))

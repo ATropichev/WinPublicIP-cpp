@@ -8,8 +8,12 @@
 
 using json = nlohmann::json;
 
+static const char* DefaultProvider =
+    "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,isp,query";
+
 GeoProvider::GeoProvider(std::string providerTemplate)
-    : providerTemplate_(std::move(providerTemplate)) {}
+    : usesDefaultProvider_(providerTemplate == DefaultProvider)
+    , providerTemplate_(std::move(providerTemplate)) {}
 
 GeoResult GeoProvider::Get(const std::string& ip)
 {
@@ -29,6 +33,14 @@ GeoResult GeoProvider::Get(const std::string& ip)
     std::string body = HttpGet(url);
     auto j = json::parse(body, nullptr, false);
     if (j.is_discarded()) throw std::runtime_error("GeoProvider: bad JSON");
+    if (!j.is_object()) throw std::runtime_error("GeoProvider: unexpected JSON");
+    if (usesDefaultProvider_) {
+        std::string status = j.value("status", "");
+        if (status != "success") {
+            std::string message = j.value("message", "lookup failed");
+            throw std::runtime_error("GeoProvider: " + message);
+        }
+    }
 
     GeoResult r;
     r.country     = j.value("country",     "Unknown");

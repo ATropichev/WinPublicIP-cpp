@@ -10,7 +10,7 @@ struct AppSettings {
         "https://icanhazip.com"
     };
     std::string geoProvider =
-        "http://ip-api.com/json/{ip}?fields=country,countryCode,isp,query";
+        "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,isp,query";
     std::vector<std::string> vpnInterfacePatterns = {
         "TAP","tun","WireGuard","OpenVPN",
         "Tailscale","ZeroTier","PPP","WAN Miniport (IKEv2)"

@@ -6,9 +6,13 @@ Scope: review of the C++/Win32 implementation for lifecycle, threading, WinAPI u
 
 Build status: checked with Visual Studio Developer environment and existing CMake/Ninja build directory. Result: `ninja: no work to do`.
 
+Status values: `Resolved`, `Partially resolved`, `Open`.
+
 ## Findings
 
 ### 1. Detached refresh threads can outlive `TrayApp`
+
+Status: `Partially resolved`
 
 `src/TrayApp.cpp` starts refresh work with `std::thread([this] { ... }).detach()`. If the application exits while a request is still running, the detached thread can continue using `ipProvider_`, `geoProvider_`, `vpnDetector_`, and `hWnd_` after `TrayApp` has been destroyed.
 
@@ -20,6 +24,8 @@ Recommendation:
 
 ### 2. Parallel refreshes can race and apply stale results
 
+Status: `Resolved`
+
 Timer refresh and manual refresh can start multiple background requests at the same time. A slow older request can finish after a newer one and overwrite the tray state with stale data. `GeoProvider` also owns mutable cache state without synchronization.
 
 Recommendation:
@@ -29,6 +35,8 @@ Recommendation:
 - Protect shared mutable provider state with a mutex, or move provider instances into the worker context.
 
 ### 3. Settings dialog exits its local loop with `PostQuitMessage`
+
+Status: `Resolved`
 
 `SettingsDialog.cpp` calls `PostQuitMessage` from the dialog `WM_DESTROY` handler. This works as a local escape hatch, but `WM_QUIT` is intended to end the thread message loop, not just a modal dialog. It also leaves the parent window enabled, so repeated commands can become reentrant.
 
@@ -40,6 +48,8 @@ Recommendation:
 
 ### 4. Query parameters may be dropped in `HttpGet`
 
+Status: `Resolved`
+
 `HttpHelper.cpp` configures `URL_COMPONENTS::lpszUrlPath`, but not `lpszExtraInfo`. URLs such as `https://api.ipify.org?format=json` and `...?fields=...` depend on the query string.
 
 Recommendation:
@@ -49,6 +59,8 @@ Recommendation:
 - Use `/` as the path fallback when the parsed path is empty.
 
 ### 5. HTTP status codes and IP format are not validated
+
+Status: `Resolved`
 
 `HttpGet` treats a completed response as success without checking the HTTP status code. `IpProvider` accepts any non-empty response body as an IP address. Error pages, rate-limit responses, or HTML bodies could be shown as the current IP or passed to geolocation.
 
@@ -60,6 +72,8 @@ Recommendation:
 
 ### 6. JSON settings need stronger validation
 
+Status: `Resolved`
+
 `AppSettings::Load` reads values from JSON with minimal validation. A hand-edited config can set invalid refresh intervals or empty provider lists.
 
 Recommendation:
@@ -70,6 +84,8 @@ Recommendation:
 
 ### 7. Clipboard handling misses error checks
 
+Status: `Resolved`
+
 `CopyIpToClipboard` does not check `GlobalAlloc`, `GlobalLock`, `OpenClipboard`, or `SetClipboardData`. If opening the clipboard fails, the allocated memory is not released.
 
 Recommendation:
@@ -79,6 +95,8 @@ Recommendation:
 
 ### 8. Named resource loading is less defensive than flag loading
 
+Status: `Resolved`
+
 `TrayRenderer.cpp` loads shield/offline resources without checking every intermediate WinAPI result. `FlagLoader.cpp` already uses a safer style with checks for resource and allocation failures.
 
 Recommendation:
@@ -87,6 +105,8 @@ Recommendation:
 - Check `LoadResource`, `LockResource`, `GlobalAlloc`, `GlobalLock`, and `CreateStreamOnHGlobal`.
 
 ## Minor Notes
+
+Status: `Resolved`
 
 `homeCountry` and `geoProvider` are present in `AppSettings`, and `homeCountry` is documented in README, but they are not currently used by the geolocation logic. Either wire them into behavior or remove them from the documented configuration surface.
 
@@ -108,9 +128,13 @@ Recommendation:
 
 Статус сборки: проверено через Visual Studio Developer environment и существующую директорию CMake/Ninja `build`. Результат: `ninja: no work to do`.
 
+Значения статусов: `Resolved`, `Partially resolved`, `Open`.
+
 ## Найденные проблемы
 
 ### 1. Detached-потоки обновления могут пережить `TrayApp`
+
+Статус: `Partially resolved`
 
 `src/TrayApp.cpp` запускает обновление через `std::thread([this] { ... }).detach()`. Если приложение закрывается, пока HTTP-запрос ещё выполняется, detached-поток может продолжить использовать `ipProvider_`, `geoProvider_`, `vpnDetector_` и `hWnd_` после уничтожения `TrayApp`.
 
@@ -122,6 +146,8 @@ Recommendation:
 
 ### 2. Параллельные обновления могут конфликтовать и применять устаревший результат
 
+Статус: `Resolved`
+
 Обновление по таймеру и ручное обновление из меню могут запустить несколько фоновых запросов одновременно. Старый медленный запрос может завершиться после нового и перезаписать состояние трея устаревшими данными. Кроме того, `GeoProvider` содержит изменяемый кэш без синхронизации.
 
 Рекомендации:
@@ -131,6 +157,8 @@ Recommendation:
 - Защитить изменяемое состояние провайдеров mutex-ом или создавать экземпляры провайдеров внутри worker-контекста.
 
 ### 3. Диалог настроек выходит из локального цикла через `PostQuitMessage`
+
+Статус: `Resolved`
 
 `SettingsDialog.cpp` вызывает `PostQuitMessage` из обработчика `WM_DESTROY` диалога. Это работает как локальный способ выйти из цикла, но `WM_QUIT` предназначен для завершения message loop потока, а не только модального диалога. Также родительское окно остаётся включённым, из-за чего возможны повторные команды и реентерабельность.
 
@@ -142,6 +170,8 @@ Recommendation:
 
 ### 4. Query-параметры могут теряться в `HttpGet`
 
+Статус: `Resolved`
+
 `HttpHelper.cpp` заполняет `URL_COMPONENTS::lpszUrlPath`, но не заполняет `lpszExtraInfo`. URL вроде `https://api.ipify.org?format=json` и `...?fields=...` зависят от query string.
 
 Рекомендации:
@@ -151,6 +181,8 @@ Recommendation:
 - Использовать `/` как fallback-путь, если разобранный path пустой.
 
 ### 5. HTTP status code и формат IP не проверяются
+
+Статус: `Resolved`
 
 `HttpGet` считает запрос успешным после получения ответа, не проверяя HTTP status code. `IpProvider` принимает любое непустое тело ответа как IP-адрес. Поэтому HTML-страница ошибки, rate-limit response или другой мусор могут попасть в tooltip или в запрос геолокации.
 
@@ -162,6 +194,8 @@ Recommendation:
 
 ### 6. JSON-настройкам нужна более строгая валидация
 
+Статус: `Resolved`
+
 `AppSettings::Load` читает значения из JSON почти без проверки. Пользователь может вручную задать некорректный интервал обновления или пустой список IP-провайдеров.
 
 Рекомендации:
@@ -172,6 +206,8 @@ Recommendation:
 
 ### 7. Работа с clipboard выполняется без проверок ошибок
 
+Статус: `Resolved`
+
 `CopyIpToClipboard` не проверяет `GlobalAlloc`, `GlobalLock`, `OpenClipboard` и `SetClipboardData`. Если открыть clipboard не удалось, выделенная память не освобождается.
 
 Рекомендации:
@@ -181,6 +217,8 @@ Recommendation:
 
 ### 8. Загрузка named resources менее защищена, чем загрузка флагов
 
+Статус: `Resolved`
+
 `TrayRenderer.cpp` загружает ресурсы щита и offline-иконки без проверки каждого промежуточного результата WinAPI. В `FlagLoader.cpp` уже используется более безопасный стиль с проверками ресурсов и выделения памяти.
 
 Рекомендации:
@@ -189,6 +227,8 @@ Recommendation:
 - Проверять `LoadResource`, `LockResource`, `GlobalAlloc`, `GlobalLock` и `CreateStreamOnHGlobal`.
 
 ## Небольшие замечания
+
+Статус: `Resolved`
 
 `homeCountry` и `geoProvider` присутствуют в `AppSettings`, а `homeCountry` описан в README, но сейчас не используются логикой геолокации. Лучше либо подключить их к поведению приложения, либо убрать из документированной поверхности конфигурации.
 

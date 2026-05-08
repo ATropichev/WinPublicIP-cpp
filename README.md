@@ -72,6 +72,8 @@ config.invalid.YYYYMMDD-HHMMSS.json
 
 Then it writes a repaired `config.json` with safe defaults or normalized values.
 
+Provider settings and `vpnInterfacePatterns` are loaded at startup. Restart the app after editing them manually in `config.json`.
+
 ### HTTP and response validation
 
 The app validates network responses before applying them:
@@ -182,6 +184,8 @@ config.invalid.YYYYMMDD-HHMMSS.json
 ```
 
 После этого записывается исправленный `config.json` с безопасными значениями по умолчанию или нормализованными значениями.
+
+Настройки провайдеров и `vpnInterfacePatterns` загружаются при старте. После ручного изменения этих полей в `config.json` перезапустите приложение.
 
 ### Проверка HTTP и ответов сервисов
 

@@ -57,11 +57,29 @@ Settings are stored in `%APPDATA%\WinPublicIP\config.json`:
 ```json
 {
   "refreshIntervalSeconds": 60,
+  "geoProvider": "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,isp,query",
   "vpnInterfacePatterns": ["TAP", "tun", "WireGuard", "OpenVPN", "Tailscale", "ZeroTier", "PPP", "WAN Miniport (IKEv2)"],
   "notifyOnIpChange": true,
   "startWithWindows": false
 }
 ```
+
+If `config.json` is malformed or contains values that must be normalized, the app keeps a backup next to it:
+
+```text
+config.invalid.YYYYMMDD-HHMMSS.json
+```
+
+Then it writes a repaired `config.json` with safe defaults or normalized values.
+
+### HTTP and response validation
+
+The app validates network responses before applying them:
+
+- HTTP responses must have a successful `2xx` status code.
+- Response bodies are limited to 1 MB.
+- Public IP provider responses must parse as valid IPv4 or IPv6.
+- The default geolocation provider must return JSON object data with `status: "success"`.
 
 ### VPN detection
 
@@ -150,11 +168,29 @@ cmake --build build
 ```json
 {
   "refreshIntervalSeconds": 60,
+  "geoProvider": "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,isp,query",
   "vpnInterfacePatterns": ["TAP", "tun", "WireGuard", "OpenVPN", "Tailscale", "ZeroTier", "PPP", "WAN Miniport (IKEv2)"],
   "notifyOnIpChange": true,
   "startWithWindows": false
 }
 ```
+
+Если `config.json` повреждён или содержит значения, которые нужно нормализовать, приложение сохраняет резервную копию рядом:
+
+```text
+config.invalid.YYYYMMDD-HHMMSS.json
+```
+
+После этого записывается исправленный `config.json` с безопасными значениями по умолчанию или нормализованными значениями.
+
+### Проверка HTTP и ответов сервисов
+
+Приложение проверяет сетевые ответы перед применением:
+
+- HTTP-ответ должен иметь успешный статус `2xx`.
+- Размер тела ответа ограничен 1 МБ.
+- Ответы провайдеров внешнего IP должны быть валидным IPv4 или IPv6.
+- Дефолтный провайдер геолокации должен вернуть JSON object с `status: "success"`.
 
 ### Определение VPN
 

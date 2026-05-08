@@ -1,8 +1,11 @@
 #include <windows.h>
 #include <shlobj.h>
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 #include "AppSettings.h"
 #include <nlohmann/json.hpp>
 
@@ -18,16 +21,52 @@ static fs::path ConfigPath()
     return p;
 }
 
-static void Normalize(AppSettings& s)
+static fs::path InvalidConfigPath(const fs::path& path)
 {
+    auto now = std::chrono::system_clock::now();
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm tm{};
+    localtime_s(&tm, &t);
+
+    std::wostringstream suffix;
+    suffix << L".invalid." << std::put_time(&tm, L"%Y%m%d-%H%M%S") << L".json";
+    return path.parent_path() / (path.stem().wstring() + suffix.str());
+}
+
+static void BackupConfig(const fs::path& path)
+{
+    if (!fs::exists(path))
+        return;
+    fs::path backup = InvalidConfigPath(path);
+    std::error_code ec;
+    fs::rename(path, backup, ec);
+    if (ec) {
+        fs::copy_file(path, backup, fs::copy_options::overwrite_existing, ec);
+    }
+}
+
+static bool Normalize(AppSettings& s)
+{
+    bool changed = false;
     AppSettings defaults;
-    s.refreshIntervalSeconds = std::max(10, std::min(3600, s.refreshIntervalSeconds));
-    if (s.ipProviders.empty())
+    int interval = std::max(10, std::min(3600, s.refreshIntervalSeconds));
+    if (interval != s.refreshIntervalSeconds) {
+        s.refreshIntervalSeconds = interval;
+        changed = true;
+    }
+    if (s.ipProviders.empty()) {
         s.ipProviders = defaults.ipProviders;
-    if (s.geoProvider.empty())
+        changed = true;
+    }
+    if (s.geoProvider.empty()) {
         s.geoProvider = defaults.geoProvider;
-    if (s.vpnInterfacePatterns.empty())
+        changed = true;
+    }
+    if (s.vpnInterfacePatterns.empty()) {
         s.vpnInterfacePatterns = defaults.vpnInterfacePatterns;
+        changed = true;
+    }
+    return changed;
 }
 
 static std::vector<std::string> ReadStringList(const json& value)
@@ -45,8 +84,10 @@ static std::vector<std::string> ReadStringList(const json& value)
 AppSettings AppSettings::Load()
 {
     AppSettings s;
+    bool shouldSave = false;
+    fs::path path;
     try {
-        auto path = ConfigPath();
+        path = ConfigPath();
         if (fs::exists(path)) {
             std::ifstream f(path);
             auto j = json::parse(f, nullptr, false);
@@ -63,10 +104,18 @@ AppSettings AppSettings::Load()
                     s.ipProviders = ReadStringList(j["ipProviders"]);
                 if (j.contains("vpnInterfacePatterns"))
                     s.vpnInterfacePatterns = ReadStringList(j["vpnInterfacePatterns"]);
+            } else {
+                BackupConfig(path);
+                shouldSave = true;
             }
         }
     } catch (...) {}
-    Normalize(s);
+    bool normalized = Normalize(s);
+    if (normalized && !shouldSave)
+        BackupConfig(path);
+    shouldSave = normalized || shouldSave;
+    if (shouldSave)
+        s.Save();
     return s;
 }
 

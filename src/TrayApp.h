@@ -1,6 +1,9 @@
 #pragma once
 #include <windows.h>
+#include <atomic>
+#include <cstdint>
 #include <string>
+#include <thread>
 #include "Config/AppSettings.h"
 #include "Services/IpProvider.h"
 #include "Services/GeoProvider.h"
@@ -36,6 +39,11 @@ private:
     UINT_PTR     timerId_    = 0;
     std::string  lastIp_;
     UINT         wmTaskbarCreated_ = 0;
+    std::thread  refreshThread_;
+    std::atomic_bool refreshInProgress_ = false;
+    std::atomic_bool shuttingDown_ = false;
+    std::atomic<std::uint64_t> nextRefreshSeq_ = 0;
+    std::uint64_t latestRefreshSeq_ = 0;
 
     void CreateWindow_();
     void AddTrayIcon();

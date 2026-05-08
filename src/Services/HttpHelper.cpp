@@ -35,14 +35,22 @@ std::string HttpGet(const std::string& url, int timeoutMs)
     uc.dwStructSize     = sizeof(uc);
     wchar_t host[256]   = {};
     wchar_t path[1024]  = {};
+    wchar_t extra[1024] = {};
     uc.lpszHostName     = host;
     uc.dwHostNameLength = _countof(host);
     uc.lpszUrlPath      = path;
     uc.dwUrlPathLength  = _countof(path);
+    uc.lpszExtraInfo    = extra;
+    uc.dwExtraInfoLength = _countof(extra);
     if (!WinHttpCrackUrl(wUrl.c_str(), 0, 0, &uc))
         throw std::runtime_error("HttpGet: bad URL");
 
     bool isHttps = (uc.nScheme == INTERNET_SCHEME_HTTPS);
+    std::wstring objectName = uc.dwUrlPathLength > 0
+        ? std::wstring(path, uc.dwUrlPathLength)
+        : L"/";
+    if (uc.dwExtraInfoLength > 0)
+        objectName.append(extra, uc.dwExtraInfoLength);
 
     WinHttpHandle hSession(WinHttpOpen(L"WinPublicIP/1.0",
         WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, nullptr, nullptr, 0));
@@ -52,7 +60,7 @@ std::string HttpGet(const std::string& url, int timeoutMs)
     if (!hConnect) throw std::runtime_error("WinHttpConnect failed");
 
     DWORD flags = isHttps ? WINHTTP_FLAG_SECURE : 0;
-    WinHttpHandle hRequest(WinHttpOpenRequest(hConnect, L"GET", path,
+    WinHttpHandle hRequest(WinHttpOpenRequest(hConnect, L"GET", objectName.c_str(),
         nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags));
     if (!hRequest) throw std::runtime_error("WinHttpOpenRequest failed");
 
@@ -68,12 +76,24 @@ std::string HttpGet(const std::string& url, int timeoutMs)
 
     if (!ok) throw std::runtime_error("HttpGet: request failed");
 
+    DWORD statusCode = 0;
+    DWORD statusSize = sizeof(statusCode);
+    if (!WinHttpQueryHeaders(hRequest,
+            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize,
+            WINHTTP_NO_HEADER_INDEX)) {
+        throw std::runtime_error("HttpGet: status unavailable");
+    }
+    if (statusCode < 200 || statusCode >= 300)
+        throw std::runtime_error("HttpGet: non-success status");
+
     std::string body;
     DWORD avail = 0;
     while (WinHttpQueryDataAvailable(hRequest, &avail) && avail > 0) {
         std::vector<char> buf(avail);
         DWORD read = 0;
-        WinHttpReadData(hRequest, buf.data(), avail, &read);
+        if (!WinHttpReadData(hRequest, buf.data(), avail, &read))
+            throw std::runtime_error("HttpGet: read failed");
         body.append(buf.data(), read);
     }
     // hRequest, hConnect, hSession закрываются деструкторами RAII-обёрток

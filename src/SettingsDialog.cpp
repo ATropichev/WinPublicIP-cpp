@@ -11,6 +11,7 @@ static const wchar_t* DLG_CLASS = L"WinPublicIPSettings";
 struct DlgState {
     AppSettings* settings;
     bool         accepted = false;
+    bool         done     = false;
     HWND         hEdit    = nullptr;
     HWND         hSpin    = nullptr;
     HFONT        hFont    = nullptr;
@@ -116,7 +117,8 @@ static LRESULT CALLBACK DlgProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_DESTROY:
         if (state->hFont) DeleteObject(state->hFont);
-        PostQuitMessage(0);
+        state->hFont = nullptr;
+        state->done = true;
         return 0;
     }
     return DefWindowProcW(hWnd, msg, wp, lp);
@@ -144,17 +146,35 @@ bool ShowSettingsDialog(HWND hParent, HINSTANCE hInstance, AppSettings& settings
     RECT rc = {0, 0, 314, 100};
     AdjustWindowRectEx(&rc, style, FALSE, exStyle);
 
-    CreateWindowExW(exStyle, DLG_CLASS,
+    BOOL parentWasEnabled = hParent ? IsWindowEnabled(hParent) : FALSE;
+    if (hParent)
+        EnableWindow(hParent, FALSE);
+
+    HWND hDlg = CreateWindowExW(exStyle, DLG_CLASS,
         L"WinPublicIP — Настройки",
         WS_VISIBLE | style,
         0, 0, rc.right - rc.left, rc.bottom - rc.top,
         hParent, nullptr, hInstance, &state);
 
+    if (!hDlg) {
+        if (hParent && parentWasEnabled)
+            EnableWindow(hParent, TRUE);
+        UnregisterClassW(DLG_CLASS, hInstance);
+        return false;
+    }
+
     MSG msg;
-    while (GetMessageW(&msg, nullptr, 0, 0)) {
+    while (!state.done && GetMessageW(&msg, nullptr, 0, 0)) {
+        if (hDlg && IsDialogMessageW(hDlg, &msg))
+            continue;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+
+    if (hParent && parentWasEnabled)
+        EnableWindow(hParent, TRUE);
+    if (hParent)
+        SetForegroundWindow(hParent);
 
     UnregisterClassW(DLG_CLASS, hInstance);
     return state.accepted;

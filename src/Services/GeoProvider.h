@@ -10,9 +10,12 @@ struct GeoResult {
 
 class GeoProvider {
 public:
+    explicit GeoProvider(std::string providerTemplate =
+        "http://ip-api.com/json/{ip}?fields=country,countryCode,isp,query");
     GeoResult Get(const std::string& ip);
     const GeoResult* LastResult() const;
 private:
+    std::string providerTemplate_;
     std::unordered_map<std::string, GeoResult> cache_;
     GeoResult last_{};
     bool hasLast_ = false;

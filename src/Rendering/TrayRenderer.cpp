@@ -9,14 +9,24 @@ static IStream* NamedResourceToStream(const char* name)
     HRSRC hRes = FindResourceA(hMod, name, MAKEINTRESOURCEA(10));
     if (!hRes) return nullptr;
     HGLOBAL hGlob = LoadResource(hMod, hRes);
+    if (!hGlob) return nullptr;
     DWORD size = SizeofResource(hMod, hRes);
     void* data = LockResource(hGlob);
+    if (!data || size == 0) return nullptr;
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, size);
+    if (!hMem) return nullptr;
     void* buf = GlobalLock(hMem);
+    if (!buf) {
+        GlobalFree(hMem);
+        return nullptr;
+    }
     memcpy(buf, data, size);
     GlobalUnlock(hMem);
     IStream* stream = nullptr;
-    CreateStreamOnHGlobal(hMem, TRUE, &stream);
+    if (FAILED(CreateStreamOnHGlobal(hMem, TRUE, &stream))) {
+        GlobalFree(hMem);
+        return nullptr;
+    }
     return stream;
 }
 

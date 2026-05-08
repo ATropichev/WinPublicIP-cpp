@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <shlobj.h>
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
 #include "AppSettings.h"
@@ -17,6 +18,30 @@ static fs::path ConfigPath()
     return p;
 }
 
+static void Normalize(AppSettings& s)
+{
+    AppSettings defaults;
+    s.refreshIntervalSeconds = std::max(10, std::min(3600, s.refreshIntervalSeconds));
+    if (s.ipProviders.empty())
+        s.ipProviders = defaults.ipProviders;
+    if (s.geoProvider.empty())
+        s.geoProvider = defaults.geoProvider;
+    if (s.vpnInterfacePatterns.empty())
+        s.vpnInterfacePatterns = defaults.vpnInterfacePatterns;
+}
+
+static std::vector<std::string> ReadStringList(const json& value)
+{
+    std::vector<std::string> result;
+    if (!value.is_array())
+        return result;
+    for (const auto& item : value) {
+        if (item.is_string())
+            result.push_back(item.get<std::string>());
+    }
+    return result;
+}
+
 AppSettings AppSettings::Load()
 {
     AppSettings s;
@@ -26,15 +51,22 @@ AppSettings AppSettings::Load()
             std::ifstream f(path);
             auto j = json::parse(f, nullptr, false);
             if (!j.is_discarded()) {
-                if (j.contains("refreshIntervalSeconds")) s.refreshIntervalSeconds = j["refreshIntervalSeconds"];
-                if (j.contains("homeCountry"))            s.homeCountry            = j["homeCountry"];
-                if (j.contains("notifyOnIpChange"))       s.notifyOnIpChange       = j["notifyOnIpChange"];
-                if (j.contains("startWithWindows"))       s.startWithWindows       = j["startWithWindows"];
-                if (j.contains("ipProviders"))            s.ipProviders            = j["ipProviders"].get<std::vector<std::string>>();
-                if (j.contains("vpnInterfacePatterns"))   s.vpnInterfacePatterns   = j["vpnInterfacePatterns"].get<std::vector<std::string>>();
+                if (j.contains("refreshIntervalSeconds") && j["refreshIntervalSeconds"].is_number_integer())
+                    s.refreshIntervalSeconds = j["refreshIntervalSeconds"];
+                if (j.contains("geoProvider") && j["geoProvider"].is_string())
+                    s.geoProvider = j["geoProvider"];
+                if (j.contains("notifyOnIpChange") && j["notifyOnIpChange"].is_boolean())
+                    s.notifyOnIpChange = j["notifyOnIpChange"];
+                if (j.contains("startWithWindows") && j["startWithWindows"].is_boolean())
+                    s.startWithWindows = j["startWithWindows"];
+                if (j.contains("ipProviders"))
+                    s.ipProviders = ReadStringList(j["ipProviders"]);
+                if (j.contains("vpnInterfacePatterns"))
+                    s.vpnInterfacePatterns = ReadStringList(j["vpnInterfacePatterns"]);
             }
         }
     } catch (...) {}
+    Normalize(s);
     return s;
 }
 
@@ -45,7 +77,7 @@ void AppSettings::Save() const
         fs::create_directories(path.parent_path());
         json j;
         j["refreshIntervalSeconds"] = refreshIntervalSeconds;
-        j["homeCountry"]            = homeCountry;
+        j["geoProvider"]            = geoProvider;
         j["ipProviders"]            = ipProviders;
         j["vpnInterfacePatterns"]   = vpnInterfacePatterns;
         j["notifyOnIpChange"]       = notifyOnIpChange;

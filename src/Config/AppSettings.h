@@ -4,7 +4,6 @@
 
 struct AppSettings {
     int  refreshIntervalSeconds  = 60;
-    std::string homeCountry      = "RU";
     std::vector<std::string> ipProviders = {
         "https://api.ipify.org?format=json",
         "https://ifconfig.me/ip",

@@ -1,5 +1,7 @@
 #include <windows.h>
 #include <shellapi.h>
+#include <cstdint>
+#include <memory>
 #include <thread>
 #include <string>
 #include <stdexcept>
@@ -11,6 +13,7 @@ static const UINT     TRAY_ID   = 1;
 
 // Структура передаётся из рабочего потока в UI через PostMessage
 struct RefreshResult {
+    std::uint64_t seq = 0;
     bool        success;
     std::string ip;
     GeoResult   geo;
@@ -37,6 +40,7 @@ TrayApp::TrayApp(HINSTANCE hInstance)
     : hInstance_(hInstance)
     , settings_(AppSettings::Load())
     , ipProvider_(settings_.ipProviders)
+    , geoProvider_(settings_.geoProvider)
     , vpnDetector_(settings_.vpnInterfacePatterns)
 {
     wmTaskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
@@ -50,7 +54,13 @@ TrayApp::TrayApp(HINSTANCE hInstance)
 
 TrayApp::~TrayApp()
 {
+    shuttingDown_.store(true);
     if (timerId_) KillTimer(hWnd_, timerId_);
+    if (refreshThread_.joinable())
+        refreshThread_.join();
+    MSG msg;
+    while (PeekMessageW(&msg, hWnd_, WM_APP_REFRESH, WM_APP_REFRESH, PM_REMOVE))
+        delete reinterpret_cast<RefreshResult*>(msg.lParam);
     RemoveTrayIcon();
     DestroyWindow(hWnd_);
 }
@@ -136,18 +146,48 @@ void TrayApp::CopyIpToClipboard()
     std::wstring wip = ToWide(lastIp_);
     size_t bytes = (wip.size() + 1) * sizeof(wchar_t);
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
-    memcpy(GlobalLock(hMem), wip.c_str(), bytes);
+    if (!hMem) return;
+    void* dest = GlobalLock(hMem);
+    if (!dest) {
+        GlobalFree(hMem);
+        return;
+    }
+    memcpy(dest, wip.c_str(), bytes);
     GlobalUnlock(hMem);
-    OpenClipboard(hWnd_);
-    EmptyClipboard();
-    SetClipboardData(CF_UNICODETEXT, hMem);
+    if (!OpenClipboard(hWnd_)) {
+        GlobalFree(hMem);
+        return;
+    }
+    if (!EmptyClipboard()) {
+        CloseClipboard();
+        GlobalFree(hMem);
+        return;
+    }
+    if (SetClipboardData(CF_UNICODETEXT, hMem))
+        hMem = nullptr;
     CloseClipboard();
+    if (hMem)
+        GlobalFree(hMem);
 }
 
 void TrayApp::StartRefreshThread()
 {
-    std::thread([this]() {
-        auto* result = new RefreshResult();
+    if (shuttingDown_.load())
+        return;
+
+    bool expected = false;
+    if (!refreshInProgress_.compare_exchange_strong(expected, true))
+        return;
+
+    if (refreshThread_.joinable())
+        refreshThread_.join();
+
+    std::uint64_t seq = ++nextRefreshSeq_;
+    latestRefreshSeq_ = seq;
+
+    refreshThread_ = std::thread([this, seq]() {
+        auto result = std::make_unique<RefreshResult>();
+        result->seq = seq;
         try {
             result->ip      = ipProvider_.Get();
             result->geo     = geoProvider_.Get(result->ip);
@@ -158,14 +198,24 @@ void TrayApp::StartRefreshThread()
             result->error   = e.what();
         }
         // Передаём результат в UI-поток
-        PostMessageW(hWnd_, WM_APP_REFRESH, 0,
-                     reinterpret_cast<LPARAM>(result));
-    }).detach();
+        if (shuttingDown_.load() || !IsWindow(hWnd_) ||
+            !PostMessageW(hWnd_, WM_APP_REFRESH, 0,
+                          reinterpret_cast<LPARAM>(result.get()))) {
+            refreshInProgress_.store(false);
+            return;
+        }
+        result.release();
+    });
 }
 
 void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
 {
-    auto* result = reinterpret_cast<RefreshResult*>(lp);
+    std::unique_ptr<RefreshResult> result(reinterpret_cast<RefreshResult*>(lp));
+
+    if (result->seq != latestRefreshSeq_) {
+        refreshInProgress_.store(false);
+        return;
+    }
 
     if (result->success) {
         bool hadPreviousIp = !lastIp_.empty();
@@ -196,7 +246,7 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
         HICON icon = renderer_.RenderOffline();
         UpdateTrayIcon(icon, L"Нет подключения");
     }
-    delete result;
+    refreshInProgress_.store(false);
 }
 
 void TrayApp::OpenSettings()

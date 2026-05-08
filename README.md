@@ -57,7 +57,6 @@ Settings are stored in `%APPDATA%\WinPublicIP\config.json`:
 ```json
 {
   "refreshIntervalSeconds": 60,
-  "homeCountry": "RU",
   "vpnInterfacePatterns": ["TAP", "tun", "WireGuard", "OpenVPN", "Tailscale", "ZeroTier", "PPP", "WAN Miniport (IKEv2)"],
   "notifyOnIpChange": true,
   "startWithWindows": false
@@ -151,7 +150,6 @@ cmake --build build
 ```json
 {
   "refreshIntervalSeconds": 60,
-  "homeCountry": "RU",
   "vpnInterfacePatterns": ["TAP", "tun", "WireGuard", "OpenVPN", "Tailscale", "ZeroTier", "PPP", "WAN Miniport (IKEv2)"],
   "notifyOnIpChange": true,
   "startWithWindows": false

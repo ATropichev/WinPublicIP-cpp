@@ -56,4 +56,5 @@ target_link_libraries(WinPublicIP PRIVATE
     gdi32.lib
     ole32.lib
     shlwapi.lib
+    ws2_32.lib
 )

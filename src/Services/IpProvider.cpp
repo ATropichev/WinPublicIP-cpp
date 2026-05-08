@@ -1,9 +1,29 @@
 #include "IpProvider.h"
 #include "HttpHelper.h"
 #include <nlohmann/json.hpp>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <stdexcept>
 
 using json = nlohmann::json;
+
+static bool IsValidIp(const std::string& value)
+{
+    IN_ADDR ipv4{};
+    IN6_ADDR ipv6{};
+    return InetPtonA(AF_INET, value.c_str(), &ipv4) == 1 ||
+           InetPtonA(AF_INET6, value.c_str(), &ipv6) == 1;
+}
+
+static void Trim(std::string& value)
+{
+    while (!value.empty() && (value.back() == '\n' || value.back() == '\r' ||
+           value.back() == ' ' || value.back() == '\t'))
+        value.pop_back();
+    while (!value.empty() && (value.front() == '\n' || value.front() == '\r' ||
+           value.front() == ' ' || value.front() == '\t'))
+        value.erase(value.begin());
+}
 
 IpProvider::IpProvider(const std::vector<std::string>& providers)
     : providers_(providers) {}
@@ -13,16 +33,18 @@ std::string IpProvider::Get()
     for (const auto& url : providers_) {
         try {
             std::string body = HttpGet(url);
-            // Trim
-            while (!body.empty() && (body.back() == '\n' || body.back() == '\r' || body.back() == ' '))
-                body.pop_back();
+            Trim(body);
             // JSON {"ip":"..."} или plain text
             if (!body.empty() && body.front() == '{') {
                 auto j = json::parse(body, nullptr, false);
-                if (!j.is_discarded() && j.contains("ip"))
-                    return j["ip"].get<std::string>();
+                if (!j.is_discarded() && j.contains("ip")) {
+                    std::string ip = j["ip"].get<std::string>();
+                    Trim(ip);
+                    if (IsValidIp(ip))
+                        return ip;
+                }
             }
-            if (!body.empty()) return body;
+            if (IsValidIp(body)) return body;
         } catch (...) {}
     }
     throw std::runtime_error("All IP providers unavailable");

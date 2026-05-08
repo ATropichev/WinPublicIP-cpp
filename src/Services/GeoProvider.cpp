@@ -2,9 +2,14 @@
 #include "HttpHelper.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <cctype>
 #include <stdexcept>
+#include <utility>
 
 using json = nlohmann::json;
+
+GeoProvider::GeoProvider(std::string providerTemplate)
+    : providerTemplate_(std::move(providerTemplate)) {}
 
 GeoResult GeoProvider::Get(const std::string& ip)
 {
@@ -15,8 +20,12 @@ GeoResult GeoProvider::Get(const std::string& ip)
         return last_;
     }
 
-    std::string url = "http://ip-api.com/json/" + ip +
-                      "?fields=country,countryCode,isp,query";
+    std::string url = providerTemplate_;
+    size_t marker = url.find("{ip}");
+    if (marker != std::string::npos)
+        url.replace(marker, 4, ip);
+    else
+        url += ip;
     std::string body = HttpGet(url);
     auto j = json::parse(body, nullptr, false);
     if (j.is_discarded()) throw std::runtime_error("GeoProvider: bad JSON");
@@ -27,7 +36,8 @@ GeoResult GeoProvider::Get(const std::string& ip)
     r.isp         = j.value("isp",         "");
     // Приводим код страны к нижнему регистру
     std::transform(r.countryCode.begin(), r.countryCode.end(),
-                   r.countryCode.begin(), ::tolower);
+                   r.countryCode.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     cache_[ip] = r;
     last_      = r;

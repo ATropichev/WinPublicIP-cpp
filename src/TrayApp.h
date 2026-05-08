@@ -44,6 +44,10 @@ private:
     std::atomic_bool shuttingDown_ = false;
     std::atomic<std::uint64_t> nextRefreshSeq_ = 0;
     std::uint64_t latestRefreshSeq_ = 0;
+    std::wstring  trayTooltip_ = L"WinPublicIP — запуск...";
+    std::string   trayCountryCode_;
+    bool          trayVpnOn_ = false;
+    bool          trayOnline_ = false;
 
     void CreateWindow_();
     void AddTrayIcon();

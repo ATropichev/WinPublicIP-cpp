@@ -3,9 +3,15 @@
 #include <nlohmann/json.hpp>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #include <stdexcept>
 
 using json = nlohmann::json;
+
+static void DebugLog(const std::string& message)
+{
+    OutputDebugStringA(("WinPublicIP: " + message + "\n").c_str());
+}
 
 static bool IsValidIp(const std::string& value)
 {
@@ -45,7 +51,11 @@ std::string IpProvider::Get()
                 }
             }
             if (IsValidIp(body)) return body;
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            DebugLog("IP provider failed: " + url + " (" + e.what() + ")");
+        } catch (...) {
+            DebugLog("IP provider failed: " + url);
+        }
     }
     throw std::runtime_error("All IP providers unavailable");
 }

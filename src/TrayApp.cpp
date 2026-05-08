@@ -11,6 +11,13 @@
 static const wchar_t* WND_CLASS = L"WinPublicIPHost";
 static const UINT     TRAY_ID   = 1;
 
+static void DebugLog(const wchar_t* message)
+{
+    OutputDebugStringW(L"WinPublicIP: ");
+    OutputDebugStringW(message);
+    OutputDebugStringW(L"\n");
+}
+
 // Структура передаётся из рабочего потока в UI через PostMessage
 struct RefreshResult {
     std::uint64_t seq = 0;
@@ -50,6 +57,8 @@ TrayApp::TrayApp(HINSTANCE hInstance)
     StartRefreshThread();
     // Таймер для периодического обновления
     timerId_ = SetTimer(hWnd_, 1, settings_.refreshIntervalSeconds * 1000, nullptr);
+    if (!timerId_)
+        DebugLog(L"failed to create refresh timer");
 }
 
 TrayApp::~TrayApp()
@@ -72,23 +81,37 @@ void TrayApp::CreateWindow_()
     wc.lpfnWndProc   = WndProc;
     wc.hInstance     = hInstance_;
     wc.lpszClassName = WND_CLASS;
-    RegisterClassExW(&wc);
+    if (!RegisterClassExW(&wc))
+        DebugLog(L"failed to register tray window class");
 
     hWnd_ = CreateWindowExW(0, WND_CLASS, L"WinPublicIP",
         0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, hInstance_, this);
+    if (!hWnd_)
+        DebugLog(L"failed to create tray host window");
 }
 
 void TrayApp::AddTrayIcon()
 {
+    HICON icon = trayOnline_
+        ? renderer_.Render(trayCountryCode_, trayVpnOn_)
+        : renderer_.RenderOffline();
+
     NOTIFYICONDATAW nid{};
     nid.cbSize           = sizeof(nid);
     nid.hWnd             = hWnd_;
     nid.uID              = TRAY_ID;
     nid.uFlags           = NIF_ICON | NIF_TIP | NIF_MESSAGE;
     nid.uCallbackMessage = WM_APP_TRAY;
-    nid.hIcon            = renderer_.RenderOffline();
-    wcsncpy_s(nid.szTip, L"WinPublicIP — запуск...", _TRUNCATE);
-    Shell_NotifyIconW(NIM_ADD, &nid);
+    nid.hIcon            = icon;
+    wcsncpy_s(nid.szTip, Trunc(trayTooltip_, 127).c_str(), _TRUNCATE);
+    if (!Shell_NotifyIconW(NIM_ADD, &nid)) {
+        DebugLog(L"failed to add tray icon");
+        return;
+    }
+
+    nid.uVersion = NOTIFYICON_VERSION_4;
+    if (!Shell_NotifyIconW(NIM_SETVERSION, &nid))
+        DebugLog(L"failed to set tray icon version");
 }
 
 void TrayApp::UpdateTrayIcon(HICON icon, const std::wstring& tooltip)
@@ -100,7 +123,8 @@ void TrayApp::UpdateTrayIcon(HICON icon, const std::wstring& tooltip)
     nid.uFlags = NIF_ICON | NIF_TIP;
     nid.hIcon  = icon;
     wcsncpy_s(nid.szTip, Trunc(tooltip, 127).c_str(), _TRUNCATE);
-    Shell_NotifyIconW(NIM_MODIFY, &nid);
+    if (!Shell_NotifyIconW(NIM_MODIFY, &nid))
+        DebugLog(L"failed to update tray icon");
 }
 
 void TrayApp::RemoveTrayIcon()
@@ -109,7 +133,8 @@ void TrayApp::RemoveTrayIcon()
     nid.cbSize = sizeof(nid);
     nid.hWnd   = hWnd_;
     nid.uID    = TRAY_ID;
-    Shell_NotifyIconW(NIM_DELETE, &nid);
+    if (!Shell_NotifyIconW(NIM_DELETE, &nid))
+        DebugLog(L"failed to remove tray icon");
 }
 
 void TrayApp::ShowContextMenu()
@@ -214,8 +239,6 @@ void TrayApp::StartRefreshThread()
 void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
 {
     std::unique_ptr<RefreshResult> result(reinterpret_cast<RefreshResult*>(lp));
-    if (refreshThread_.joinable())
-        refreshThread_.join();
 
     if (result->seq != latestRefreshSeq_) {
         refreshInProgress_.store(false);
@@ -233,6 +256,10 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
             L"IP: " + ToWide(result->ip) +
             L"\n" + ToWide(result->geo.country) +
             L"\nVPN: " + vpnStr;
+        trayOnline_ = true;
+        trayCountryCode_ = result->geo.countryCode;
+        trayVpnOn_ = result->vpnOn;
+        trayTooltip_ = tooltip;
         UpdateTrayIcon(icon, tooltip);
 
         // Balloon при смене IP
@@ -245,11 +272,14 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
             nid.dwInfoFlags = NIIF_INFO;
             wcsncpy_s(nid.szInfo,     ToWide(result->ip).c_str(), _TRUNCATE);
             wcsncpy_s(nid.szInfoTitle, L"IP изменился", _TRUNCATE);
-            Shell_NotifyIconW(NIM_MODIFY, &nid);
+            if (!Shell_NotifyIconW(NIM_MODIFY, &nid))
+                DebugLog(L"failed to show IP change notification");
         }
     } else {
         HICON icon = renderer_.RenderOffline();
-        UpdateTrayIcon(icon, L"Нет подключения");
+        trayOnline_ = false;
+        trayTooltip_ = L"Нет подключения";
+        UpdateTrayIcon(icon, trayTooltip_);
     }
     refreshInProgress_.store(false);
 }
@@ -263,6 +293,8 @@ void TrayApp::OpenSettings()
             KillTimer(hWnd_, timerId_);
             timerId_ = SetTimer(hWnd_, 1,
                 settings_.refreshIntervalSeconds * 1000, nullptr);
+            if (!timerId_)
+                DebugLog(L"failed to recreate refresh timer");
         }
     }
 }
@@ -291,12 +323,13 @@ LRESULT CALLBACK TrayApp::WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
 
     if (msg == app->wmTaskbarCreated_) {
         app->AddTrayIcon();
+        app->StartRefreshThread();
         return 0;
     }
 
     switch (msg) {
     case WM_APP_TRAY:
-        if (lp == WM_RBUTTONUP || lp == WM_CONTEXTMENU)
+        if (LOWORD(lp) == WM_RBUTTONUP || LOWORD(lp) == WM_CONTEXTMENU)
             app->ShowContextMenu();
         return 0;
 

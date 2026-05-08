@@ -28,6 +28,12 @@ static std::wstring ToWide(const std::string& s)
     return w;
 }
 
+static void SetTimeoutOption(HINTERNET request, DWORD option, DWORD timeout)
+{
+    if (!WinHttpSetOption(request, option, &timeout, sizeof(timeout)))
+        throw std::runtime_error("HttpGet: failed to set timeout");
+}
+
 std::string HttpGet(const std::string& url, int timeoutMs)
 {
     constexpr size_t MaxBodySize = 1024 * 1024;
@@ -67,10 +73,10 @@ std::string HttpGet(const std::string& url, int timeoutMs)
     if (!hRequest) throw std::runtime_error("WinHttpOpenRequest failed");
 
     DWORD timeout = static_cast<DWORD>(timeoutMs);
-    WinHttpSetOption(hRequest, WINHTTP_OPTION_CONNECT_TIMEOUT, &timeout, sizeof(timeout));
-    WinHttpSetOption(hRequest, WINHTTP_OPTION_RECEIVE_TIMEOUT, &timeout, sizeof(timeout));
-    WinHttpSetOption(hRequest, WINHTTP_OPTION_SEND_TIMEOUT,    &timeout, sizeof(timeout));
-    WinHttpSetOption(hRequest, WINHTTP_OPTION_RESOLVE_TIMEOUT, &timeout, sizeof(timeout));
+    SetTimeoutOption(hRequest, WINHTTP_OPTION_CONNECT_TIMEOUT, timeout);
+    SetTimeoutOption(hRequest, WINHTTP_OPTION_RECEIVE_TIMEOUT, timeout);
+    SetTimeoutOption(hRequest, WINHTTP_OPTION_SEND_TIMEOUT,    timeout);
+    SetTimeoutOption(hRequest, WINHTTP_OPTION_RESOLVE_TIMEOUT, timeout);
 
     bool ok = WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
                                  WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&

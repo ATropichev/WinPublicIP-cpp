@@ -13,6 +13,12 @@
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+enum class BackupResult {
+    Failed,
+    Moved,
+    Copied,
+};
+
 static void DebugLog(const wchar_t* message)
 {
     OutputDebugStringW(L"WinPublicIP: ");
@@ -48,11 +54,11 @@ static fs::path InvalidConfigPath(const fs::path& path, int counter)
     return path.parent_path() / (path.stem().wstring() + suffix.str());
 }
 
-static bool BackupConfig(const fs::path& path)
+static BackupResult BackupConfig(const fs::path& path)
 {
     std::error_code ec;
     if (path.empty() || !fs::exists(path, ec))
-        return false;
+        return BackupResult::Failed;
 
     for (int i = 0; i < 100; ++i) {
         fs::path backup = InvalidConfigPath(path, i);
@@ -61,15 +67,20 @@ static bool BackupConfig(const fs::path& path)
 
         fs::rename(path, backup, ec);
         if (!ec)
-            return true;
+            return BackupResult::Moved;
 
         ec.clear();
-        if (fs::copy_file(path, backup, fs::copy_options::none, ec))
-            return true;
+        if (fs::copy_file(path, backup, fs::copy_options::none, ec)) {
+            auto originalSize = fs::file_size(path, ec);
+            if (ec) continue;
+            auto backupSize = fs::file_size(backup, ec);
+            if (!ec && originalSize == backupSize)
+                return BackupResult::Copied;
+        }
     }
 
     DebugLog(L"failed to create config backup");
-    return false;
+    return BackupResult::Failed;
 }
 
 static bool Normalize(AppSettings& s)
@@ -111,6 +122,7 @@ static std::vector<std::string> ReadStringList(const json& value)
 AppSettings AppSettings::Load()
 {
     AppSettings s;
+    BackupResult backupResult = BackupResult::Failed;
     bool shouldSave = false;
     fs::path path;
     try {
@@ -132,7 +144,8 @@ AppSettings AppSettings::Load()
                 if (j.contains("vpnInterfacePatterns"))
                     s.vpnInterfacePatterns = ReadStringList(j["vpnInterfacePatterns"]);
             } else {
-                shouldSave = BackupConfig(path);
+                backupResult = BackupConfig(path);
+                shouldSave = backupResult != BackupResult::Failed;
                 if (!shouldSave)
                     DebugLog(L"skipped repairing malformed config because backup failed");
             }
@@ -142,7 +155,8 @@ AppSettings AppSettings::Load()
     }
     bool normalized = Normalize(s);
     if (normalized && !shouldSave) {
-        shouldSave = BackupConfig(path);
+        backupResult = BackupConfig(path);
+        shouldSave = backupResult != BackupResult::Failed;
         if (!shouldSave)
             DebugLog(L"skipped saving normalized config because backup failed");
     }

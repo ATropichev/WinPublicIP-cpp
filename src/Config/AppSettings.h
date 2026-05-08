@@ -20,5 +20,6 @@ struct AppSettings {
 
     static AppSettings Load();
     void Save() const;
-    void SetAutorun(bool enable) const;
+    bool IsAutorunEnabled() const;
+    bool SetAutorun(bool enable) const;
 };

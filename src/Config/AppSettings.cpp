@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <cwchar>
 #include "AppSettings.h"
 #include <nlohmann/json.hpp>
 
@@ -34,6 +35,84 @@ static fs::path ConfigPath()
     fs::path p = fs::path(appData) / L"WinPublicIP" / L"config.json";
     CoTaskMemFree(appData);
     return p;
+}
+
+static const wchar_t* AutorunKeyPath()
+{
+    return L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+}
+
+static const wchar_t* AutorunValueName()
+{
+    return L"WinPublicIP";
+}
+
+static std::wstring CurrentExePath()
+{
+    wchar_t exePath[MAX_PATH] = {};
+    DWORD len = GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH)
+        return {};
+    return exePath;
+}
+
+static std::wstring FullPathOrOriginal(const std::wstring& path)
+{
+    wchar_t full[MAX_PATH] = {};
+    DWORD len = GetFullPathNameW(path.c_str(), MAX_PATH, full, nullptr);
+    if (len == 0 || len >= MAX_PATH)
+        return path;
+    return full;
+}
+
+static std::wstring ExtractExecutablePath(const std::wstring& command)
+{
+    if (command.empty())
+        return {};
+    if (command.front() == L'"') {
+        size_t end = command.find(L'"', 1);
+        if (end != std::wstring::npos)
+            return command.substr(1, end - 1);
+    }
+    size_t end = command.find_first_of(L" \t");
+    return end == std::wstring::npos ? command : command.substr(0, end);
+}
+
+static bool SamePath(const std::wstring& a, const std::wstring& b)
+{
+    if (a.empty() || b.empty())
+        return false;
+    std::wstring left = FullPathOrOriginal(a);
+    std::wstring right = FullPathOrOriginal(b);
+    return _wcsicmp(left.c_str(), right.c_str()) == 0;
+}
+
+static bool ReadAutorunCommand(std::wstring& command)
+{
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, AutorunKeyPath(), 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
+        return false;
+
+    wchar_t value[1024] = {};
+    DWORD type = 0;
+    DWORD bytes = sizeof(value);
+    LONG rc = RegQueryValueExW(hKey, AutorunValueName(), nullptr, &type,
+        reinterpret_cast<BYTE*>(value), &bytes);
+    RegCloseKey(hKey);
+
+    if (rc != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ))
+        return false;
+    if (type == REG_EXPAND_SZ) {
+        wchar_t expanded[1024] = {};
+        DWORD len = ExpandEnvironmentStringsW(value, expanded, _countof(expanded));
+        if (len > 0 && len <= _countof(expanded))
+            command.assign(expanded);
+        else
+            command.assign(value);
+    } else {
+        command.assign(value);
+    }
+    return true;
 }
 
 static fs::path InvalidConfigPath(const fs::path& path, int counter)
@@ -137,8 +216,6 @@ AppSettings AppSettings::Load()
                     s.geoProvider = j["geoProvider"];
                 if (j.contains("notifyOnIpChange") && j["notifyOnIpChange"].is_boolean())
                     s.notifyOnIpChange = j["notifyOnIpChange"];
-                if (j.contains("startWithWindows") && j["startWithWindows"].is_boolean())
-                    s.startWithWindows = j["startWithWindows"];
                 if (j.contains("ipProviders"))
                     s.ipProviders = ReadStringList(j["ipProviders"]);
                 if (j.contains("vpnInterfacePatterns"))
@@ -160,6 +237,7 @@ AppSettings AppSettings::Load()
         if (!shouldSave)
             DebugLog(L"skipped saving normalized config because backup failed");
     }
+    s.startWithWindows = s.IsAutorunEnabled();
     if (shouldSave)
         s.Save();
     return s;
@@ -178,7 +256,6 @@ void AppSettings::Save() const
         j["ipProviders"]            = ipProviders;
         j["vpnInterfacePatterns"]   = vpnInterfacePatterns;
         j["notifyOnIpChange"]       = notifyOnIpChange;
-        j["startWithWindows"]       = startWithWindows;
         fs::path tempPath = path;
         tempPath += L".tmp";
         std::ofstream f(tempPath, std::ios::trunc);
@@ -197,28 +274,43 @@ void AppSettings::Save() const
     }
 }
 
-void AppSettings::SetAutorun(bool enable) const
+bool AppSettings::IsAutorunEnabled() const
 {
-    const wchar_t* keyPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    const wchar_t* valName = L"WinPublicIP";
+    std::wstring command;
+    if (!ReadAutorunCommand(command))
+        return false;
+    return SamePath(ExtractExecutablePath(command), CurrentExePath());
+}
+
+bool AppSettings::SetAutorun(bool enable) const
+{
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, keyPath, 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS) {
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, AutorunKeyPath(), 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS) {
         DebugLog(L"failed to open autorun registry key");
-        return;
+        return false;
     }
+    bool ok = true;
     if (enable) {
-        wchar_t exePath[MAX_PATH];
-        GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+        std::wstring exePath = CurrentExePath();
+        if (exePath.empty()) {
+            RegCloseKey(hKey);
+            DebugLog(L"failed to get executable path for autorun");
+            return false;
+        }
         std::wstring val = std::wstring(L"\"") + exePath + L"\"";
-        if (RegSetValueExW(hKey, valName, 0, REG_SZ,
+        if (RegSetValueExW(hKey, AutorunValueName(), 0, REG_SZ,
             reinterpret_cast<const BYTE*>(val.c_str()),
             static_cast<DWORD>((val.size() + 1) * sizeof(wchar_t))) != ERROR_SUCCESS) {
             DebugLog(L"failed to set autorun registry value");
+            ok = false;
         }
     } else {
-        LONG rc = RegDeleteValueW(hKey, valName);
-        if (rc != ERROR_SUCCESS && rc != ERROR_FILE_NOT_FOUND)
+        LONG rc = RegDeleteValueW(hKey, AutorunValueName());
+        if (rc != ERROR_SUCCESS && rc != ERROR_FILE_NOT_FOUND) {
             DebugLog(L"failed to delete autorun registry value");
+            ok = false;
+        }
     }
     RegCloseKey(hKey);
+    return ok;
 }

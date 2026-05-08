@@ -168,7 +168,8 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
     auto* result = reinterpret_cast<RefreshResult*>(lp);
 
     if (result->success) {
-        bool ipChanged = result->ip != lastIp_;
+        bool hadPreviousIp = !lastIp_.empty();
+        bool ipChanged = hadPreviousIp && result->ip != lastIp_;
         lastIp_ = result->ip;
 
         HICON icon = renderer_.Render(result->geo.countryCode, result->vpnOn);
@@ -180,7 +181,7 @@ void TrayApp::OnRefreshDone(WPARAM, LPARAM lp)
         UpdateTrayIcon(icon, tooltip);
 
         // Balloon при смене IP
-        if (settings_.notifyOnIpChange && ipChanged && !lastIp_.empty()) {
+        if (settings_.notifyOnIpChange && ipChanged) {
             NOTIFYICONDATAW nid{};
             nid.cbSize    = sizeof(nid);
             nid.hWnd      = hWnd_;

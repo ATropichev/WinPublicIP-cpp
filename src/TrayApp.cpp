@@ -52,6 +52,8 @@ TrayApp::TrayApp(HINSTANCE hInstance)
 {
     wmTaskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
     CreateWindow_();
+    if (!hWnd_)
+        throw std::runtime_error("failed to create tray host window");
     AddTrayIcon();
     // Первое обновление сразу
     StartRefreshThread();
@@ -160,6 +162,7 @@ void TrayApp::ShowContextMenu()
     GetCursorPos(&pt);
     TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN,
                    pt.x, pt.y, 0, hWnd_, nullptr);
+    PostMessageW(hWnd_, WM_NULL, 0, 0);
     DestroyMenu(hMenu);
 }
 

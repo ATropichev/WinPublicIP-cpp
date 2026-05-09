@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <objidl.h>
 #include <gdiplus.h>
+#include <exception>
 #include "TrayApp.h"
 
 static const wchar_t* MUTEX_NAME =
@@ -28,13 +29,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
 
     // Инициализация GDI+
     Gdiplus::GdiplusStartupInput gdipInput;
-    ULONG_PTR gdipToken;
-    Gdiplus::GdiplusStartup(&gdipToken, &gdipInput, nullptr);
+    ULONG_PTR gdipToken = 0;
+    if (Gdiplus::GdiplusStartup(&gdipToken, &gdipInput, nullptr) != Gdiplus::Ok) {
+        MessageBoxW(nullptr,
+            L"Не удалось инициализировать графическую подсистему WinPublicIP.",
+            L"WinPublicIP",
+            MB_OK | MB_ICONERROR);
+        CloseHandle(hMutex);
+        return 1;
+    }
 
     // Запуск приложения
-    {
+    try {
         TrayApp app(hInstance);
         app.Run();
+    } catch (const std::exception& e) {
+        MessageBoxA(nullptr, e.what(), "WinPublicIP", MB_OK | MB_ICONERROR);
+        Gdiplus::GdiplusShutdown(gdipToken);
+        CloseHandle(hMutex);
+        return 1;
+    } catch (...) {
+        MessageBoxW(nullptr,
+            L"Не удалось запустить WinPublicIP.",
+            L"WinPublicIP",
+            MB_OK | MB_ICONERROR);
+        Gdiplus::GdiplusShutdown(gdipToken);
+        CloseHandle(hMutex);
+        return 1;
     }
 
     // Завершение GDI+

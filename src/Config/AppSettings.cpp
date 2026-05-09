@@ -78,12 +78,18 @@ static std::wstring FullPathOrOriginal(const std::wstring& path)
     return std::wstring(full.data(), len);
 }
 
-static size_t FindExeExtension(const std::wstring& command)
+static bool IsRegularFilePath(const std::wstring& path)
+{
+    std::error_code ec;
+    return fs::is_regular_file(fs::path(path), ec);
+}
+
+static size_t FindExeExtension(const std::wstring& command, size_t offset)
 {
     std::wstring lower = command;
     std::transform(lower.begin(), lower.end(), lower.begin(),
         [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
-    return lower.find(L".exe");
+    return lower.find(L".exe", offset);
 }
 
 static std::wstring ExtractExecutablePath(const std::wstring& command)
@@ -95,9 +101,16 @@ static std::wstring ExtractExecutablePath(const std::wstring& command)
         if (end != std::wstring::npos)
             return command.substr(1, end - 1);
     }
-    size_t exe = FindExeExtension(command);
-    if (exe != std::wstring::npos)
-        return command.substr(0, exe + 4);
+    size_t offset = 0;
+    while (true) {
+        size_t exe = FindExeExtension(command, offset);
+        if (exe == std::wstring::npos)
+            break;
+        std::wstring candidate = command.substr(0, exe + 4);
+        if (IsRegularFilePath(candidate))
+            return candidate;
+        offset = exe + 4;
+    }
     size_t end = command.find_first_of(L" \t");
     return end == std::wstring::npos ? command : command.substr(0, end);
 }

@@ -48,9 +48,10 @@ private:
     std::string   trayCountryCode_;
     bool          trayVpnOn_ = false;
     bool          trayOnline_ = false;
+    bool          trayIconAdded_ = false;
 
     void CreateWindow_();
-    void AddTrayIcon();
+    bool AddTrayIcon();
     void UpdateTrayIcon(HICON icon, const std::wstring& tooltip);
     void RemoveTrayIcon();
     void ShowContextMenu();

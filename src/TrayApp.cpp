@@ -54,13 +54,24 @@ TrayApp::TrayApp(HINSTANCE hInstance)
     CreateWindow_();
     if (!hWnd_)
         throw std::runtime_error("failed to create tray host window");
-    AddTrayIcon();
-    // Первое обновление сразу
-    StartRefreshThread();
-    // Таймер для периодического обновления
-    timerId_ = SetTimer(hWnd_, 1, settings_.refreshIntervalSeconds * 1000, nullptr);
-    if (!timerId_)
-        DebugLog(L"failed to create refresh timer");
+    try {
+        if (!AddTrayIcon())
+            throw std::runtime_error("failed to add tray icon");
+        // Первое обновление сразу
+        StartRefreshThread();
+        // Таймер для периодического обновления
+        timerId_ = SetTimer(hWnd_, 1, settings_.refreshIntervalSeconds * 1000, nullptr);
+        if (!timerId_)
+            DebugLog(L"failed to create refresh timer");
+    } catch (...) {
+        shuttingDown_.store(true);
+        if (refreshThread_.joinable())
+            refreshThread_.join();
+        RemoveTrayIcon();
+        DestroyWindow(hWnd_);
+        hWnd_ = nullptr;
+        throw;
+    }
 }
 
 TrayApp::~TrayApp()
@@ -92,7 +103,7 @@ void TrayApp::CreateWindow_()
         DebugLog(L"failed to create tray host window");
 }
 
-void TrayApp::AddTrayIcon()
+bool TrayApp::AddTrayIcon()
 {
     HICON icon = trayOnline_
         ? renderer_.Render(trayCountryCode_, trayVpnOn_)
@@ -108,8 +119,10 @@ void TrayApp::AddTrayIcon()
     wcsncpy_s(nid.szTip, Trunc(trayTooltip_, 127).c_str(), _TRUNCATE);
     if (!Shell_NotifyIconW(NIM_ADD, &nid)) {
         DebugLog(L"failed to add tray icon");
-        return;
+        return false;
     }
+    trayIconAdded_ = true;
+    return true;
 }
 
 void TrayApp::UpdateTrayIcon(HICON icon, const std::wstring& tooltip)
@@ -127,12 +140,15 @@ void TrayApp::UpdateTrayIcon(HICON icon, const std::wstring& tooltip)
 
 void TrayApp::RemoveTrayIcon()
 {
+    if (!trayIconAdded_)
+        return;
     NOTIFYICONDATAW nid{};
     nid.cbSize = sizeof(nid);
     nid.hWnd   = hWnd_;
     nid.uID    = TRAY_ID;
     if (!Shell_NotifyIconW(NIM_DELETE, &nid))
         DebugLog(L"failed to remove tray icon");
+    trayIconAdded_ = false;
 }
 
 void TrayApp::ShowContextMenu()

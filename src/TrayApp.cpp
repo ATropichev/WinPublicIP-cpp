@@ -108,10 +108,6 @@ void TrayApp::AddTrayIcon()
         DebugLog(L"failed to add tray icon");
         return;
     }
-
-    nid.uVersion = NOTIFYICON_VERSION_4;
-    if (!Shell_NotifyIconW(NIM_SETVERSION, &nid))
-        DebugLog(L"failed to set tray icon version");
 }
 
 void TrayApp::UpdateTrayIcon(HICON icon, const std::wstring& tooltip)

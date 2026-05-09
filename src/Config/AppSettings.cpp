@@ -8,6 +8,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <cwchar>
+#include <cwctype>
+#include <vector>
 #include "AppSettings.h"
 #include <nlohmann/json.hpp>
 
@@ -49,20 +51,39 @@ static const wchar_t* AutorunValueName()
 
 static std::wstring CurrentExePath()
 {
-    wchar_t exePath[MAX_PATH] = {};
-    DWORD len = GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH)
-        return {};
-    return exePath;
+    std::vector<wchar_t> exePath(MAX_PATH);
+    for (;;) {
+        DWORD len = GetModuleFileNameW(nullptr, exePath.data(),
+            static_cast<DWORD>(exePath.size()));
+        if (len == 0)
+            return {};
+        if (len < exePath.size() - 1)
+            return std::wstring(exePath.data(), len);
+        if (exePath.size() >= 32768)
+            return {};
+        exePath.resize(exePath.size() * 2);
+    }
 }
 
 static std::wstring FullPathOrOriginal(const std::wstring& path)
 {
-    wchar_t full[MAX_PATH] = {};
-    DWORD len = GetFullPathNameW(path.c_str(), MAX_PATH, full, nullptr);
-    if (len == 0 || len >= MAX_PATH)
+    DWORD needed = GetFullPathNameW(path.c_str(), 0, nullptr, nullptr);
+    if (needed == 0)
         return path;
-    return full;
+    std::vector<wchar_t> full(needed);
+    DWORD len = GetFullPathNameW(path.c_str(), static_cast<DWORD>(full.size()),
+        full.data(), nullptr);
+    if (len == 0 || len >= full.size())
+        return path;
+    return std::wstring(full.data(), len);
+}
+
+static size_t FindExeExtension(const std::wstring& command)
+{
+    std::wstring lower = command;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+        [](wchar_t c) { return static_cast<wchar_t>(std::towlower(c)); });
+    return lower.find(L".exe");
 }
 
 static std::wstring ExtractExecutablePath(const std::wstring& command)
@@ -74,6 +95,9 @@ static std::wstring ExtractExecutablePath(const std::wstring& command)
         if (end != std::wstring::npos)
             return command.substr(1, end - 1);
     }
+    size_t exe = FindExeExtension(command);
+    if (exe != std::wstring::npos)
+        return command.substr(0, exe + 4);
     size_t end = command.find_first_of(L" \t");
     return end == std::wstring::npos ? command : command.substr(0, end);
 }
@@ -93,24 +117,36 @@ static bool ReadAutorunCommand(std::wstring& command)
     if (RegOpenKeyExW(HKEY_CURRENT_USER, AutorunKeyPath(), 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
         return false;
 
-    wchar_t value[1024] = {};
     DWORD type = 0;
-    DWORD bytes = sizeof(value);
-    LONG rc = RegQueryValueExW(hKey, AutorunValueName(), nullptr, &type,
-        reinterpret_cast<BYTE*>(value), &bytes);
+    DWORD bytes = 0;
+    LONG rc = RegQueryValueExW(hKey, AutorunValueName(), nullptr, &type, nullptr, &bytes);
+    if (rc != ERROR_SUCCESS || bytes == 0 || (type != REG_SZ && type != REG_EXPAND_SZ)) {
+        RegCloseKey(hKey);
+        return false;
+    }
+
+    std::vector<wchar_t> value(bytes / sizeof(wchar_t) + 1, L'\0');
+    rc = RegQueryValueExW(hKey, AutorunValueName(), nullptr, &type,
+        reinterpret_cast<BYTE*>(value.data()), &bytes);
     RegCloseKey(hKey);
 
     if (rc != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ))
         return false;
     if (type == REG_EXPAND_SZ) {
-        wchar_t expanded[1024] = {};
-        DWORD len = ExpandEnvironmentStringsW(value, expanded, _countof(expanded));
-        if (len > 0 && len <= _countof(expanded))
-            command.assign(expanded);
+        DWORD needed = ExpandEnvironmentStringsW(value.data(), nullptr, 0);
+        if (needed > 0) {
+            std::vector<wchar_t> expanded(needed);
+            DWORD len = ExpandEnvironmentStringsW(value.data(), expanded.data(),
+                static_cast<DWORD>(expanded.size()));
+            if (len > 0 && len <= expanded.size())
+                command.assign(expanded.data());
+            else
+                command.assign(value.data());
+        }
         else
-            command.assign(value);
+            command.assign(value.data());
     } else {
-        command.assign(value);
+        command.assign(value.data());
     }
     return true;
 }
@@ -285,8 +321,10 @@ bool AppSettings::IsAutorunEnabled() const
 bool AppSettings::SetAutorun(bool enable) const
 {
     HKEY hKey;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, AutorunKeyPath(), 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS) {
-        DebugLog(L"failed to open autorun registry key");
+    DWORD disposition = 0;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, AutorunKeyPath(), 0, nullptr, 0,
+            KEY_SET_VALUE, nullptr, &hKey, &disposition) != ERROR_SUCCESS) {
+        DebugLog(L"failed to open or create autorun registry key");
         return false;
     }
     bool ok = true;

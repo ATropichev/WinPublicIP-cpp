@@ -125,6 +125,16 @@ bool TrayApp::AddTrayIcon()
     return true;
 }
 
+bool TrayApp::RestoreTrayIcon()
+{
+    trayIconAdded_ = false;
+    if (!AddTrayIcon()) {
+        DebugLog(L"failed to restore tray icon after Explorer restart");
+        return false;
+    }
+    return true;
+}
+
 void TrayApp::UpdateTrayIcon(HICON icon, const std::wstring& tooltip)
 {
     NOTIFYICONDATAW nid{};
@@ -339,8 +349,8 @@ LRESULT CALLBACK TrayApp::WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
     if (!app) return DefWindowProcW(hWnd, msg, wp, lp);
 
     if (msg == app->wmTaskbarCreated_) {
-        app->AddTrayIcon();
-        app->StartRefreshThread();
+        if (app->RestoreTrayIcon())
+            app->StartRefreshThread();
         return 0;
     }
 

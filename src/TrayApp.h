@@ -52,6 +52,7 @@ private:
 
     void CreateWindow_();
     bool AddTrayIcon();
+    bool RestoreTrayIcon();
     void UpdateTrayIcon(HICON icon, const std::wstring& tooltip);
     void RemoveTrayIcon();
     void ShowContextMenu();
